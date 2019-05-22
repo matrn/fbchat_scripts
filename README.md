@@ -1,7 +1,7 @@
 FBchat library scripts
 =========
 
-Different script for great library[fbchat](https://github.com/carpedm20/fbchat).
+Different script for great library [fbchat](https://github.com/carpedm20/fbchat).
 
 
 ## Usage
