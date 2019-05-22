@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.6
 
-#linux urllib install: sudo apt install python-urllib3 python-requests
-# sudo pip3.6 install fbchat
+#linux urllib install: sudo apt install python-requests
+#sudo pip3.6 install fbchat
 
 
 from fbchat import Client
@@ -10,7 +10,6 @@ import getpass
 import os
 #from urllib3.request import urlretrieve
 import requests
-from urllib3.util import parse_url
 import re
 import sys
 
@@ -23,7 +22,7 @@ except ImportError:
 
 import time
 
-STEPS = 30
+STEPS = 30   #how many messages will be downloaded
 
 
 
@@ -31,33 +30,19 @@ STEPS = 30
 parser = argparse.ArgumentParser(description='Facebook images downloader')
 
 parser.add_argument('--email', type=str, help='User email', required=True)
-
 parser.add_argument('--chat', type=str, help='Name of conversation', required=True)
-
 parser.add_argument('--password', type=str, help='User password, note that this method is not secure!')
-# Required positional argument
 parser.add_argument('--last', type=int, metavar='NUM', help='Download last [NUM] images')
-
-# Optional positional argument
 parser.add_argument('--messages', type=int, metavar='NUM', help='Fecth last [NUM] messages')
-
-# Switch
 parser.add_argument('--all', action='store_true', help='Download all images')
-
 parser.add_argument('--onedir', action='store_true', help='Download to only one directory')
 
 args = parser.parse_args()
 
-'''
 
-if len(sys.argv) == 3:
-	if sys.argv[1] == "l":
-		latest = int(sys.argv[2])
-		print("latest ENABLED !!!!")
-
-'''
 email = args.email
 password = args.password
+thread_name = args.chat
 
 print("Using email %s" % email)
 
@@ -73,32 +58,10 @@ client = Client(email, password, user_agent='Mozilla/5.0 (X11; Ubuntu; Linux x86
 
 
 '''
-# Fetches a list of all users you're currently chatting with, as `User` objects
-users = client.fetchAllUsers()
-
-print("users' IDs: {}".format(user.uid for user in users))
-print("users' names: {}".format(user.name for user in users))
-
-# If we have a user id, we can use `fetchUserInfo` to fetch a `User` object
-user = client.fetchUserInfo('<user id>')['<user id>']
-# We can also query both mutiple users together, which returns list of `User` objects
-users = client.fetchUserInfo('<1st user id>', '<2nd user id>', '<3rd user id>')
-
-print("user's name: {}".format(user.name))
-print("users' names: {}".format(users[k].name for k in users))
-
-
-# `searchForUsers` searches for the user and gives us a list of the results,
-# and then we just take the first one, aka. the most likely one:
-user = client.searchForUsers('Michal Tancjura')[0]
-
-print('user ID: {}'.format(user.uid))
-print("user's name: {}".format(user.name))
-print("user's photo: {}".format(user.photo))
-print("Is user client's friend: {}".format(user.is_friend))
+ Function for crreating directory
+ Return value:
+    name of created directory
 '''
-
-
 def create_dir(name_t):
 	name = "attachments"
 	if not os.path.exists(name):
@@ -111,30 +74,14 @@ def create_dir(name_t):
 
 
 create_dir("")   #create attachments directory
-create_dir("from_you")
-create_dir("from_others")
+create_dir("from_you")   #create directory for attachments from this user
+create_dir("from_others")   #create directory for attachments from other users
+
+
 
 '''
-def download_img(dir, url):
-	path = parse_url(url).path
-	filename = path[path.rfind("/")+1:]
-	print(filename)
-
-	#urlretrieve(url, dir + "/" + filename)  
-
-	with open(dir + "/" + filename, 'wb') as handle:
-		response = requests.get(url, stream=True)
-
-		if not response.ok:
-			print(response)
-
-		for block in response.iter_content(1024):
-			if not block:
-				break
-
-			handle.write(block)
+ Function for downloading file from url and setting correct utime
 '''
-
 def download_file(dir, url, timestamp):
 	filename = os.path.basename(urlparse.urlparse(url).path)
 
@@ -170,41 +117,38 @@ def download_file(dir, url, timestamp):
 
 			handle.write(block)
 
+
 	print("setting time of file modify")
 	os.utime(path, (time.time(), int(timestamp)))
 
 
-# Fetches a list of the 20 top threads you're currently chatting with
-thread_name = args.chat
 
+
+
+#-----get searched user's thread uid-----
 uid_c = None
-threads = client.fetchAllUsers()
+threads = client.fetchAllUsers()   #get all user's threads
 
-for thread in threads:
+for thread in threads:  #iterate over threads
 	#print(thread.name)
 	#print(thread.uid)
 
-	if thread.name.startswith(thread_name):
+	if thread.name.startswith(thread_name):   #check if current thread starts with passed chat name
 		uid_c = thread.uid
 		print("Found thread with name >%s< and uid >%s<" % (thread.name, thread.uid))
 		break
-
 
 
 if uid_c == None:
 	print("Unable to find thread with name >%s<, exiting" % thread_name)
 	client.logout()
 	exit(5)
+#-----get searched user's thread uid-----
 
 
-
-# Fetches the next 10 threads
-#threads += client.fetchThreadList(limit=10)
-
-#print("Threads: {}".format(threads))
-
+#-----fetch and set number of attachments and messages-----
 thread_info = client.fetchThreadInfo(uid_c)[uid_c]
-thread_info = client.fetchThreadInfo(uid_c)[uid_c]   #twice because of documentation
+thread_info = client.fetchThreadInfo(uid_c)[uid_c]   #twice because of documentation but idk
 messages_count = thread_info.message_count
 print("Number of messages in the thread: %d" % messages_count)
 
@@ -212,41 +156,25 @@ print("Number of messages in the thread: %d" % messages_count)
 messages_number = None
 attach_number = None
 
-if args.messages != None:
+if args.messages != None:   #set number of messages to fetch
 	messages_number = args.messages
-else:
+
+else:   #number of messages to fetch is not specified so set to maximum
 	messages_number = messages_count
 
 
-if args.all:
+if args.all:   #if all attachments is specified
 	attach_number = messages_count   #maximum number of attachments
 
-elif args.last != None:
+
+elif args.last != None:   #if last X attachments is specified
 	attach_number = args.last
 
 else:
 	attach_number = 1
 
 print("Fetching %d messages and trying to donwload %d images" % (messages_number, attach_number))
-
-# Gets the last 10 messages sent to the thread
-#messages = client.fetchThreadMessages(thread_id=uid_c, limit=messages_number)
-# Since the message come in reversed order, reverse them
-#messages.reverse()
-
-'''
-# Prints the content of all the messages
-ll = 0
-for message in messages:
-	if message.attachments != None and len(message.attachments) > 0: ll += 1
-
-print(ll)
-count = 0
-'''
-
-
-
-
+#-----fetch and set number of attachments and messages-----
 
 
 
@@ -259,59 +187,36 @@ active = True
 while messages_count <= messages_number and active == True:
 	#nonlocal active, attach_count, last_timestamp, messages_count
 
-	messages = client.fetchThreadMessages(thread_id=uid_c, limit=min(STEPS, messages_number), before=last_timestamp)
+	messages = client.fetchThreadMessages(thread_id=uid_c, limit=min(STEPS, messages_number), before=last_timestamp)   #get specific number of messages starting at last timestamp
 
-	if last_timestamp != None:
+	if last_timestamp != None:   #remove first item because it's message with passed timestamp and we don't want it
 		messages.pop(0)
 
 	messages_count += len(messages)
-	print("Total number of messages %d" % messages_count)
+	print("Number of fetched messages %d" % messages_count)
+
 	if len(messages) == 0:
 		print("End of messages")
 		active = False
 		break
 
-	last_timestamp = messages[-1].timestamp
 
-	for message in messages:
+	last_timestamp = messages[-1].timestamp   #save new timestamp
+
+
+	for message in messages:   #iterate over messages
 		print("---------")
 		#print(message)
 		print(">%s<" % message.text)
 
-		'''
-		for msg in messages:
-			#print(msg)
-			if msg == ImageAttachment:
-				print("YES")
-		try: 
-			print(client.fetchImageUrl(message))
-		except:
-			pass
-		'''
-		msg_id = re.sub("[^a-zA-Z0-9]","", message.uid)
+
+		msg_id = re.sub("[^a-zA-Z0-9]","", message.uid)   #get from message uid only letters and numbers
 		
 
-		if message.attachments != None and len(message.attachments) > 0:
+		if message.attachments != None and len(message.attachments) > 0:   #check if message has any attachments
 			
 			if attach_count <= attach_number:
-				'''
-				name = ""
-				if len(message.attachments) > 1:
-					name = create_dir(msg_id)
-
-				else:
-					name = create_dir("")
-
-				for act in message.attachments:
-					print(act)
-					uid = act.uid
-					url = client.fetchImageUrl(uid)
-					print("URL = %s" % url)
-
-					download_img(name, url)
-				'''
-
-				for current in message.attachments:
+				for current in message.attachments:   #iterate over attachments
 					print(type(current))
 
 					filename = None
@@ -321,6 +226,8 @@ while messages_count <= messages_number and active == True:
 					dir = None
 					dir_sub = None
 
+
+					#-----create and chooose correct directory-----
 					if client.uid == message.author:
 						print("Message from this user")
 						dir_sub = "from_you"
@@ -328,12 +235,15 @@ while messages_count <= messages_number and active == True:
 						print("Message from other user/users")
 						dir_sub = "from_others"
 
-					if len(message.attachments) > 1 and args.onedir == False:
+
+					if len(message.attachments) > 1 and args.onedir == False:   #if enabled, create directory for more attachments in one message
 						dir = create_dir(dir_sub + '/' + msg_id)
 					else:
 						dir = "attachments/" + dir_sub
+					#-----create and chooose correct directory-----
 
 
+					#-----detect attachment type-----
 					if isinstance(current, ImageAttachment):
 						print("It's image")
 						extension = current.original_extension
@@ -348,6 +258,7 @@ while messages_count <= messages_number and active == True:
 					if isinstance(current, VideoAttachment):
 						print("It's video")
 						url = current.preview_url
+					#-----detect attachment type-----
 
 
 					if url != None and timestamp != None:
@@ -367,21 +278,4 @@ while messages_count <= messages_number and active == True:
 
 print("Total number of fetched messages %d, downloaded %d files" % (messages_count, attach_count))
 
-
 client.logout()
-
-	
-'''
-# If we have a thread id, we can use `fetchThreadInfo` to fetch a `Thread` object
-thread = client.fetchThreadInfo('<thread id>')['<thread id>']
-print("thread's name: {}".format(thread.name))
-print("thread's type: {}".format(thread.type))
-
-
-# `searchForThreads` searches works like `searchForUsers`, but gives us a list of threads instead
-thread = client.searchForThreads('<name of thread>')[0]
-print("thread's name: {}".format(thread.name))
-print("thread's type: {}".format(thread.type))
-'''
-
-# Here should be an example of `getUnread`
