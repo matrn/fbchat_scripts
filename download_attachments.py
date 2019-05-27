@@ -27,7 +27,7 @@ STEPS = 30   #how many messages will be downloaded
 
 
 # Instantiate the parser
-parser = argparse.ArgumentParser(description='Facebook images downloader')
+parser = argparse.ArgumentParser(description='Facebook chat attachments downloader')
 
 parser.add_argument('--email', type=str, help='User email', required=True)
 parser.add_argument('--chat', type=str, help='Name of conversation', required=True)
