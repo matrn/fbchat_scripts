@@ -31,12 +31,12 @@ parser = argparse.ArgumentParser(description='Facebook chat attachments download
 
 parser.add_argument('--email', type=str, help='User email', required=True)
 parser.add_argument('--chat', type=str, help='Name of conversation', required=True)
+parser.add_argument('--exact', action='store_true', help='Exact chat name')
 parser.add_argument('--password', type=str, help='User password, note that this method is not secure!')
 parser.add_argument('--last', type=int, metavar='NUM', help='Download last [NUM] images')
 parser.add_argument('--messages', type=int, metavar='NUM', help='Fecth last [NUM] messages')
 parser.add_argument('--all', action='store_true', help='Download all images')
 parser.add_argument('--onedir', action='store_true', help='Download to only one directory')
-
 args = parser.parse_args()
 
 
@@ -53,7 +53,7 @@ else:
 
 
 
-client = Client(email, password, user_agent='Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0')
+client = Client(email, password, user_agent='Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0')
 
 
 
@@ -133,7 +133,7 @@ for thread in threads:  #iterate over threads
 	#print(thread.name)
 	#print(thread.uid)
 
-	if thread.name.startswith(thread_name):   #check if current thread starts with passed chat name
+	if (args.exact == False and thread.name.startswith(thread_name)) or (args.exact == True and thread.name == thread_name):   #check if current thread starts with passed chat name
 		uid_c = thread.uid
 		print("Found thread with name >%s< and uid >%s<" % (thread.name, thread.uid))
 		break
@@ -184,98 +184,109 @@ last_timestamp = None
 messages_count = 0
 active = True
 
-while messages_count <= messages_number and active == True:
-	#nonlocal active, attach_count, last_timestamp, messages_count
+try:
+	while messages_count <= messages_number and active == True:
+		#nonlocal active, attach_count, last_timestamp, messages_count
 
-	messages = client.fetchThreadMessages(thread_id=uid_c, limit=min(STEPS, messages_number), before=last_timestamp)   #get specific number of messages starting at last timestamp
+		messages = client.fetchThreadMessages(thread_id=uid_c, limit=min(STEPS, messages_number), before=last_timestamp)   #get specific number of messages starting at last timestamp
 
-	if last_timestamp != None:   #remove first item because it's message with passed timestamp and we don't want it
-		messages.pop(0)
+		if last_timestamp != None:   #remove first item because it's message with passed timestamp and we don't want it
+			messages.pop(0)
 
-	messages_count += len(messages)
-	print("Number of fetched messages %d" % messages_count)
+		messages_count += len(messages)
+		print("Number of fetched messages %d" % messages_count)
 
-	if len(messages) == 0:
-		print("End of messages")
-		active = False
-		break
-
-
-	last_timestamp = messages[-1].timestamp   #save new timestamp
+		if len(messages) == 0:
+			print("End of messages")
+			active = False
+			break
 
 
-	for message in messages:   #iterate over messages
-		print("---------")
-		#print(message)
-		print(">%s<" % message.text)
+		last_timestamp = messages[-1].timestamp   #save new timestamp
 
 
-		msg_id = re.sub("[^a-zA-Z0-9]","", message.uid)   #get from message uid only letters and numbers
-		
+		for message in messages:   #iterate over messages
+			print("---------")
+			#print(message)
+			print(">%s<" % message.text)
+			#if message.unset: print("Message removed!")
 
-		if message.attachments != None and len(message.attachments) > 0:   #check if message has any attachments
+
+			msg_id = re.sub("[^a-zA-Z0-9]","", message.uid)   #get from message uid only letters and numbers
 			
-			if attach_count <= attach_number:
-				for current in message.attachments:   #iterate over attachments
-					print(type(current))
 
-					filename = None
-					extension = None
-					url = None
-					timestamp = float(message.timestamp)/1000
-					dir = None
-					dir_sub = None
+			if message.attachments != None and len(message.attachments) > 0:   #check if message has any attachments
+				
+				if attach_count <= attach_number:
+					for current in message.attachments:   #iterate over attachments
+						print(type(current))
 
-
-					#-----create and chooose correct directory-----
-					if client.uid == message.author:
-						print("Message from this user")
-						dir_sub = "from_you"
-					else:
-						print("Message from other user/users")
-						dir_sub = "from_others"
+						filename = None
+						extension = None
+						url = None
+						timestamp = float(message.timestamp)/1000
+						dir = None
+						dir_sub = None
 
 
-					if len(message.attachments) > 1 and args.onedir == False:   #if enabled, create directory for more attachments in one message
-						dir = create_dir(dir_sub + '/' + msg_id)
-					else:
-						dir = "attachments/" + dir_sub
-					#-----create and chooose correct directory-----
+						#-----create and chooose correct directory-----
+						if client.uid == message.author:
+							print("Message from this user")
+							dir_sub = "from_you"
+						else:
+							print("Message from other user/users")
+							dir_sub = "from_others"
 
 
-					#-----detect attachment type-----
-					if isinstance(current, ImageAttachment):
-						print("It's image")
-						extension = current.original_extension
-						url = client.fetchImageUrl(current.uid)
-
-					if isinstance(current, AudioAttachment):
-						print("It's audio")
-						filename = current.filename
-						extension = filename.split('.')[-1]
-						url = current.url
-
-					if isinstance(current, VideoAttachment):
-						print("It's video")
-						url = current.preview_url
-					#-----detect attachment type-----
+						if len(message.attachments) > 1 and args.onedir == False:   #if enabled, create directory for more attachments in one message
+							dir = create_dir(dir_sub + '/' + msg_id)
+						else:
+							dir = "attachments/" + dir_sub
+						#-----create and chooose correct directory-----
 
 
-					if url != None and timestamp != None:
-						attach_count += 1
-						print("%d. Downloading >%s< to directory >%s<" % (attach_count, url, dir))
-						download_file(dir, url, timestamp)
+						#-----detect attachment type-----
+						if isinstance(current, ImageAttachment):
+							print("It's image")
+							extension = current.original_extension
+							url = client.fetchImageUrl(current.uid)
 
-					else:
-						print("Not downloading")
+						if isinstance(current, AudioAttachment):
+							print("It's audio")
+							filename = current.filename
+							extension = filename.split('.')[-1]
+							url = current.url
 
-			else:
-				print("Downloaded %d attachments" % attach_count)
-				active = False
-				break
+						if isinstance(current, VideoAttachment):
+							print("It's video")
+							url = current.preview_url
+
+						if isinstance(current, FileAttachment):
+							print("It's a file")
+							url = current.url
+							print(url)
+							name = current.name
+							#malicious = current.is_malicous
+							size = current.size
+						#-----detect attachment type-----
 
 
+						if url != None and timestamp != None:
+							attach_count += 1
+							print("%d. Downloading >%s< to directory >%s<" % (attach_count, url, dir))
+							download_file(dir, url, timestamp)
 
-print("Total number of fetched messages %d, downloaded %d files" % (messages_count, attach_count))
+						else:
+							print("Not downloading")
+
+				else:
+					print("Downloaded %d attachments" % attach_count)
+					active = False
+					break
+except Exception as e:
+	print(e)
+
 
 client.logout()
+
+print("Total number of fetched messages %d, downloaded %d files" % (messages_count, attach_count))

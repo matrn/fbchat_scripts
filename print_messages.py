@@ -43,7 +43,7 @@ else:
 
 
 
-client = Client(email, password, user_agent='Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:66.0) Gecko/20100101 Firefox/66.0')
+client = Client(email, password, user_agent='Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:71.0) Gecko/20100101 Firefox/71.0')
 
 
 
